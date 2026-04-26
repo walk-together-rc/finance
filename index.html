@@ -546,6 +546,12 @@
 const STORAGE_KEY = 'familyBank_v3';
 const STOCK_CACHE_KEY = 'familyBank_stockCache_v2';
 
+// ローカル日付を YYYY-MM-DD で返す（toISOString はUTC基準のため日本時間でズレる）
+function getLocalDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function getLocalDate() { return getLocalDateStr(new Date()); }
+
 const DEFAULT_DATA = {
   settings: { childName: 'こどもちゃん', bankRate: 0.05 },
   bank: { deposits: [], withdrawals: [] },
@@ -592,7 +598,7 @@ function parseYahooJson(data) {
   const timestamps = result.timestamp || [];
   const closes = result.indicators.quote[0].close || [];
   const history = timestamps
-    .map((t, i) => ({ date: new Date(t * 1000).toISOString().slice(0, 10), price: closes[i] }))
+    .map((t, i) => ({ date: getLocalDateStr(new Date(t * 1000)), price: closes[i] }))
     .filter(d => d.price != null);
   return {
     current: meta.regularMarketPrice,
@@ -926,10 +932,10 @@ function checkAchievements() {
 }
 
 function doCheckIn() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDate();
   const last = appData.gamification.lastCheckIn;
   if (last === today) return;
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const yesterday = getLocalDateStr(new Date(Date.now() - 86400000));
   appData.gamification.streak = (last === yesterday) ? (appData.gamification.streak || 0) + 1 : 1;
   appData.gamification.lastCheckIn = today;
   addXP(10);
@@ -1117,7 +1123,7 @@ function confirmDeposit() {
   const amount = parseFloat(document.getElementById('depositAmount').value);
   if (!amount || amount < 1) { alert('金額を入力してください'); return; }
   const note = document.getElementById('depositNote').value.trim();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDate();
   const id = Date.now().toString();
   const seq = appData.history.length;
 
@@ -1199,7 +1205,7 @@ function confirmPartialWithdraw() {
   if (!amount || amount < 1) { alert('金額を入力してください'); return; }
   if (amount > currentTotal + 0.5) { alert(`引き出せる最大額は ${fmt(currentTotal)} です`); return; }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDate();
   const withdrawAmt = Math.min(amount, currentTotal);
   const profit_before = account === 'bank' ? nw.bank.interest : (account === 'papa' ? nw.papa.profit : nw.mama.profit);
   const pct = withdrawAmt / currentTotal;
@@ -1233,12 +1239,12 @@ function doPartialWithdrawFifo(account, targetAmount, valueFn) {
     if (cv <= remaining + 0.01) {
       remaining -= cv;
       dep.withdrawn = true;
-      appData[account].withdrawals.push({ id: Date.now().toString(), date: new Date().toISOString().slice(0,10), depositId: dep.id, amount: cv });
+      appData[account].withdrawals.push({ id: Date.now().toString(), date: getLocalDate(), depositId: dep.id, amount: cv });
     } else {
       const ratio = remaining / cv;
       dep.amount = dep.amount * (1 - ratio);
       if (dep.originalAmount === undefined) dep.originalAmount = dep.amount / (1 - ratio);
-      appData[account].withdrawals.push({ id: Date.now().toString(), date: new Date().toISOString().slice(0,10), depositId: dep.id, amount: remaining, partial: true });
+      appData[account].withdrawals.push({ id: Date.now().toString(), date: getLocalDate(), depositId: dep.id, amount: remaining, partial: true });
       remaining = 0;
     }
   }
@@ -1274,13 +1280,13 @@ function buildBankDetailChart(ctx) {
     return;
   }
   const minDate = activeDeps.reduce((m, d) => d.date < m ? d.date : m, activeDeps[0].date);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDate();
   // Generate weekly data points from minDate to today
   const points = [];
-  let cur = new Date(minDate);
-  const end = new Date(today);
+  let cur = new Date(minDate + 'T00:00:00'); // ローカル時刻で初期化
+  const end = new Date(today + 'T00:00:00');
   while (cur <= end) {
-    const dateStr = cur.toISOString().slice(0, 10);
+    const dateStr = getLocalDateStr(cur);
     // Only include deposits up to this date
     const total = activeDeps.filter(d => d.date <= dateStr).reduce((sum, d) => sum + bankCurrentValue(d, dateStr), 0);
     const principal = activeDeps.filter(d => d.date <= dateStr).reduce((sum, d) => sum + d.amount, 0);
@@ -1468,7 +1474,7 @@ function exportCSV() {
   const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = `ファミリーバンク_${new Date().toISOString().slice(0,10)}.csv`;
+  a.href = url; a.download = `ファミリーバンク_${getLocalDate()}.csv`;
   a.click(); URL.revokeObjectURL(url);
 }
 
