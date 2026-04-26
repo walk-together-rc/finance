@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>💰 ファミリーバンク</title>
+  <title>ファミリーバンク</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
   <style>
     :root {
@@ -53,10 +54,15 @@
     .nw-label { font-size: 0.75rem; color: var(--text-dim); letter-spacing: 0.1em; margin-bottom: 4px; text-transform: uppercase; }
     .nw-amount { font-size: 2.6rem; font-weight: 900; color: #d97706; letter-spacing: -0.02em; }
     .nw-profit { font-size: 0.95rem; margin-top: 5px; }
-    .nw-breakdown { display: flex; justify-content: center; gap: 18px; margin-top: 12px; flex-wrap: wrap; }
-    .nw-item { text-align: center; background: white; border-radius: 10px; padding: 8px 14px; border: 1px solid var(--border); min-width: 90px; }
-    .nw-item-label { font-size: 0.68rem; color: var(--text-dim); margin-bottom: 2px; }
-    .nw-item-val { font-size: 0.92rem; font-weight: bold; }
+    .nw-breakdown { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+    .nw-item { text-align: center; background: white; border-radius: 10px; padding: 8px 4px; border: 1px solid var(--border); }
+    .nw-item-label { font-size: 0.6rem; color: var(--text-dim); margin-bottom: 2px; line-height: 1.6; word-break: keep-all; overflow-wrap: break-word; }
+    .nw-item-val { font-size: 0.85rem; font-weight: bold; }
+
+    /* ─── INFO BUTTON ─── */
+    .info-btn { position: absolute; top: 12px; right: 14px; width: 28px; height: 28px; background: rgba(255,255,255,0.85); border: 1.5px solid #bfdbfe; border-radius: 50%; color: #2563eb; font-size: 0.9rem; font-weight: bold; font-style: italic; font-family: Georgia,serif; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; backdrop-filter: blur(4px); }
+    .info-btn:hover { background: #dbeafe; transform: scale(1.1); }
+    .info-modal-body { font-size: 0.84rem; line-height: 1.7; max-height: 70vh; overflow-y: auto; }
 
     /* ─── TABS ─── */
     .tabs { display: flex; background: white; border-bottom: 2px solid #e2e8f0; }
@@ -239,21 +245,22 @@
 </div>
 
 <!-- ══════════ NET WORTH ══════════ -->
-<div class="net-worth-section">
+<div class="net-worth-section" style="position:relative;">
+  <button class="info-btn" onclick="document.getElementById('infoModal').classList.add('show')" title="お金を増やす方法を見る">i</button>
   <div class="nw-label">💼 ぜんぶあわせた資産</div>
   <div class="nw-amount" id="netWorthAmount">¥0</div>
   <div class="nw-profit" id="netWorthProfit"></div>
   <div class="nw-breakdown">
     <div class="nw-item">
-      <div class="nw-item-label">🏦 パパ銀行</div>
+      <div class="nw-item-label">🏦<br>パパ銀行</div>
       <div class="nw-item-val" id="nwBank" style="color:#d97706">¥0</div>
     </div>
     <div class="nw-item">
-      <div class="nw-item-label">📈 パパ・インデックス</div>
+      <div class="nw-item-label">📈<br>パパ・インデックス</div>
       <div class="nw-item-val" id="nwPapa" style="color:#2563eb">¥0</div>
     </div>
     <div class="nw-item">
-      <div class="nw-item-label">🌍 ママ・インデックス</div>
+      <div class="nw-item-label">🌍<br>ママ・インデックス</div>
       <div class="nw-item-val" id="nwMama" style="color:#db2777">¥0</div>
     </div>
   </div>
@@ -262,8 +269,8 @@
 <!-- ══════════ TABS ══════════ -->
 <div class="tabs">
   <div class="tab active" onclick="switchTab('home')"><span class="tab-icon">🏠</span>ホーム</div>
+  <div class="tab" onclick="switchTab('history')"><span class="tab-icon">📒</span>通帳</div>
   <div class="tab" onclick="switchTab('badges')"><span class="tab-icon">🏅</span>獲得バッジ</div>
-  <div class="tab" onclick="switchTab('history')"><span class="tab-icon">📒</span>履歴</div>
   <div class="tab" onclick="switchTab('settings')"><span class="tab-icon">⚙️</span>設定</div>
 </div>
 
@@ -272,12 +279,6 @@
 
   <!-- HOME TAB -->
   <div class="tab-panel active" id="panel-home">
-    <div class="info-box">
-      📚 <strong>お金を増やす3つの方法：</strong><br>
-      🏦 <strong>パパ銀行</strong>…年5%の利子が毎日つく。長く預けるほど複利でどんどん増える！<br>
-      📈 <strong>パパ・インデックス</strong>…日経平均（日本の株）に連動してお金が増えたり減ったりする！<br>
-      🌍 <strong>ママ・インデックス</strong>…オルカン（世界中の株）に連動してお金が増えたり減ったりする！
-    </div>
 
     <!-- BANK CARD -->
     <div class="account-card bank">
@@ -299,9 +300,9 @@
         </div>
       </div>
       <div class="btn-group">
-        <button class="btn btn-deposit" onclick="openDepositModal('bank')">💴 預ける</button>
-        <button class="btn btn-withdraw" onclick="openPartialWithdrawModal('bank')">💸 引き出す</button>
-        <button class="btn btn-detail" onclick="openDetailModal('bank')">📊 詳細</button>
+        <button class="btn btn-deposit" onclick="openDepositModal('bank')">預ける</button>
+        <button class="btn btn-withdraw" onclick="openPartialWithdrawModal('bank')">引き出す</button>
+        <button class="btn btn-detail" onclick="openDetailModal('bank')">詳細</button>
       </div>
     </div>
 
@@ -325,9 +326,9 @@
         </div>
       </div>
       <div class="btn-group">
-        <button class="btn btn-deposit" onclick="openDepositModal('papa')">💴 買う</button>
-        <button class="btn btn-withdraw" onclick="openPartialWithdrawModal('papa')">💸 売る</button>
-        <button class="btn btn-detail" onclick="openDetailModal('papa')">📊 詳細</button>
+        <button class="btn btn-deposit" onclick="openDepositModal('papa')">買う</button>
+        <button class="btn btn-withdraw" onclick="openPartialWithdrawModal('papa')">売る</button>
+        <button class="btn btn-detail" onclick="openDetailModal('papa')">詳細</button>
       </div>
     </div>
 
@@ -351,20 +352,12 @@
         </div>
       </div>
       <div class="btn-group">
-        <button class="btn btn-deposit" onclick="openDepositModal('mama')">💴 買う</button>
-        <button class="btn btn-withdraw" onclick="openPartialWithdrawModal('mama')">💸 売る</button>
-        <button class="btn btn-detail" onclick="openDetailModal('mama')">📊 詳細</button>
+        <button class="btn btn-deposit" onclick="openDepositModal('mama')">買う</button>
+        <button class="btn btn-withdraw" onclick="openPartialWithdrawModal('mama')">売る</button>
+        <button class="btn btn-detail" onclick="openDetailModal('mama')">詳細</button>
       </div>
     </div>
 
-    <!-- COMPOUND TIMELINE -->
-    <div class="compound-section">
-      <div class="section-title-bar">🌱 複利シミュレーション（¥1,000を預けたら…）</div>
-      <div class="info-box">
-        💡 <strong>複利とは？</strong> 利子にもまた利子がつく仕組み！長く預けるほど「雪だるま式」に増えていきます。
-      </div>
-      <div class="compound-timeline" id="compoundTimeline"></div>
-    </div>
   </div>
 
   <!-- BADGES TAB -->
@@ -463,6 +456,29 @@
 
 <!-- ══════════ MODALS ══════════ -->
 
+<!-- Info Modal (お金の知識) -->
+<div class="modal-overlay" id="infoModal">
+  <div class="modal modal-wide">
+    <h3>💡 お金を増やす方法とは？</h3>
+    <div class="info-modal-body">
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:0.84rem;line-height:1.7;color:#1e40af;">
+        📚 <strong>お金を増やす3つの方法</strong><br><br>
+        🏦 <strong>パパ銀行</strong>…年5%の利子が毎日つく。長く預けるほど複利でどんどん増える！<br>
+        📈 <strong>パパ・インデックス</strong>…日経平均（日本の株）に連動してお金が増えたり減ったりする！<br>
+        🌍 <strong>ママ・インデックス</strong>…オルカン（世界中の株）に連動してお金が増えたり減ったりする！
+      </div>
+      <div style="font-size:0.8rem;font-weight:bold;color:var(--text-dim);letter-spacing:0.04em;margin-bottom:8px;">🌱 複利シミュレーション（¥1,000を預けたら…）</div>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:0.8rem;color:#1e40af;">
+        💡 <strong>複利とは？</strong> 利子にもまた利子がつく仕組み！長く預けるほど「雪だるま式」に増えていきます。
+      </div>
+      <div class="compound-timeline" id="compoundTimeline" style="padding-bottom:6px;"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-cancel" style="flex:none;width:100%;text-align:center;" onclick="closeModal('infoModal')">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <!-- Deposit Modal -->
 <div class="modal-overlay" id="depositModal">
   <div class="modal">
@@ -479,7 +495,7 @@
     <div id="depositPricePreview" style="display:none" class="price-preview"></div>
     <div class="modal-btns">
       <button class="btn btn-cancel" onclick="closeModal('depositModal')">キャンセル</button>
-      <button class="btn btn-confirm-dep" id="depositConfirmBtn" onclick="confirmDeposit()">💴 預ける</button>
+      <button class="btn btn-confirm-dep" id="depositConfirmBtn" onclick="confirmDeposit()">預ける</button>
     </div>
   </div>
 </div>
@@ -498,7 +514,7 @@
     <div class="price-preview" id="pwPreview" style="display:none"></div>
     <div class="modal-btns">
       <button class="btn btn-cancel" onclick="closeModal('partialWithdrawModal')">キャンセル</button>
-      <button class="btn btn-confirm-wth" id="pwConfirmBtn" onclick="confirmPartialWithdraw()">💸 引き出す</button>
+      <button class="btn btn-confirm-wth" id="pwConfirmBtn" onclick="confirmPartialWithdraw()">引き出す</button>
     </div>
   </div>
 </div>
@@ -1004,7 +1020,7 @@ function openDepositModal(account) {
   };
   document.getElementById('depositModalTitle').textContent = titles[account];
   document.getElementById('depositModalSubtitle').textContent = subs[account];
-  document.getElementById('depositConfirmBtn').textContent = account === 'bank' ? '💴 預ける' : '💴 買う';
+  document.getElementById('depositConfirmBtn').textContent = account === 'bank' ? '預ける' : '買う';
   document.getElementById('depositAmount').value = '';
   document.getElementById('depositNote').value = '';
   document.getElementById('depositPricePreview').style.display = 'none';
@@ -1078,7 +1094,7 @@ function openPartialWithdrawModal(account) {
   document.getElementById('pwAmount').value = '';
   document.getElementById('pwAmountLabel').textContent = `${actionWord}金額（円）`;
   document.getElementById('pwAmountHint').textContent = `最大 ${fmt(currentTotal)} まで${actionWord}ことができます`;
-  document.getElementById('pwConfirmBtn').textContent = `💸 ${actionWord}`;
+  document.getElementById('pwConfirmBtn').textContent = actionWord;
   document.getElementById('pwPreview').style.display = 'none';
   document.getElementById('partialWithdrawModal').classList.add('show');
   const amtEl = document.getElementById('pwAmount');
@@ -1594,7 +1610,7 @@ function confirmImport() {
 // UI HELPERS
 // ══════════════════════════════════════════════════════
 function switchTab(tab) {
-  const tabs = ['home','badges','history','settings'];
+  const tabs = ['home','history','badges','settings'];
   document.querySelectorAll('.tab').forEach((el, i) => el.classList.toggle('active', tabs[i] === tab));
   document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
   document.getElementById('panel-'+tab).classList.add('active');
