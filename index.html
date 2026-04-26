@@ -161,8 +161,9 @@
     .pb-date-year { display: block; }
     .pb-date-day  { display: block; font-weight: 600; color: var(--text); }
     /* 金額セル：折り返し禁止 */
-    .pb-out { color: var(--danger); font-weight: bold; text-align: right; white-space: nowrap; width: 80px; }
-    .pb-in  { color: var(--success); font-weight: bold; text-align: right; white-space: nowrap; width: 80px; }
+    .pb-out { color: var(--danger); font-weight: bold; text-align: center; white-space: nowrap; width: 80px; }
+    .pb-in  { color: var(--success); font-weight: bold; text-align: center; white-space: nowrap; width: 80px; }
+    .pb-amt-inner { display: inline-block; text-align: right; min-width: 62px; }
     .pb-balance { font-weight: bold; color: var(--text); text-align: right; white-space: nowrap; }
     /* 内容（最終列） */
     .pb-desc { color: var(--text); font-size: 0.78rem; padding-right: 10px !important; min-width: 130px; }
@@ -393,8 +394,8 @@
           <thead>
             <tr>
               <th style="text-align:left;">日付</th>
-              <th style="text-align:right;">金額</th>
               <th style="text-align:left;">内容</th>
+              <th style="text-align:center;">金額</th>
             </tr>
           </thead>
           <tbody id="passbookBody">
@@ -1049,13 +1050,13 @@ function renderHistory() {
     const dateHtml = `<span class="pb-date-year">${parts[0]}</span><span class="pb-date-day">${parts[1]}/${parts[2]}</span>`;
     const tag = `<span class="tag ${tagCls[tx.type]||'tag-bank'}">${typeLabel[tx.type]||tx.type}</span>`;
     const amtCell = isIn
-      ? `<td class="pb-in">＋${fmt(tx.amount)}</td>`
-      : `<td class="pb-out">−${fmt(tx.amount)}</td>`;
+      ? `<td class="pb-in"><span class="pb-amt-inner">＋${fmt(tx.amount)}</span></td>`
+      : `<td class="pb-out"><span class="pb-amt-inner">−${fmt(tx.amount)}</span></td>`;
     const intCls = tx.type === 'bank_int' ? ' class="pb-interest-row"' : '';
     html += `<tr${intCls}>
       <td class="pb-date">${dateHtml}</td>
-      ${amtCell}
       <td class="pb-desc">${tag}${tx.note ? `<div class="pb-desc-sub">${tx.note}</div>` : ''}</td>
+      ${amtCell}
     </tr>`;
   }
   tbody.innerHTML = html;
