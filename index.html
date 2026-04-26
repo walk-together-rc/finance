@@ -246,7 +246,6 @@
 
 <!-- ══════════ NET WORTH ══════════ -->
 <div class="net-worth-section" style="position:relative;">
-  <button class="info-btn" onclick="document.getElementById('infoModal').classList.add('show')" title="お金を増やす方法を見る">i</button>
   <div class="nw-label">💼 ぜんぶあわせた資産</div>
   <div class="nw-amount" id="netWorthAmount">¥0</div>
   <div class="nw-profit" id="netWorthProfit"></div>
@@ -1378,8 +1377,10 @@ function buildIndexDetailChart(ctx, account) {
   }
 
   // ── 現在マーカー（損益つき） ──
+  // y座標はラインの終端と一致させるため hist の最終価格を使う
   const todayIdx = hist.length - 1;
-  if (currentPrice !== null) {
+  const markerY = hist[todayIdx].price; // ライン終点と同じ値（円換算済み）
+  if (markerY != null) {
     const totalProfit = activeDeps.reduce((s, d) => s + (indexCurrentValue(d, rawCurrentPrice) - d.amount), 0);
     const profitLabel = activeDeps.length > 0
       ? `現在 ${totalProfit >= 0 ? '+' : ''}${fmt(totalProfit)}`
@@ -1387,7 +1388,7 @@ function buildIndexDetailChart(ctx, account) {
     datasets.push({
       type: 'scatter',
       label: profitLabel,
-      data: [{ x: hist[todayIdx].date.slice(5), y: currentPrice }],
+      data: [{ x: hist[todayIdx].date.slice(5), y: markerY }],
       backgroundColor: activeDeps.length === 0 ? '#64748b' : (totalProfit >= 0 ? '#16a34a' : '#dc2626'),
       pointRadius: 10, pointStyle: 'circle',
       borderColor: activeDeps.length === 0 ? '#334155' : (totalProfit >= 0 ? '#14532d' : '#7f1d1d'),
