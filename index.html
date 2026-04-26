@@ -558,6 +558,7 @@ let appData = loadData();
 let stockPrices = { nikkei: null, nikkeiPrev: null, acwi: null, acwiPrev: null, nikkeiHist: [], acwiHist: [], usdjpy: null, isCache: false, cachedAt: null };
 let currentDepositAccount = null;
 let currentPwAccount = null;
+let currentDetailAccount = null;
 let detailChartInstance = null;
 
 function loadData() {
@@ -573,35 +574,100 @@ function loadData() {
 function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); }
 
 // ══════════════════════════════════════════════════════
-// STOCK FETCHING
+// STOCK FETCHING  — multi-proxy with automatic fallback
 // ══════════════════════════════════════════════════════
-async function fetchStockData(ticker) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1y`;
-  const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-  const res = await fetch(proxy, { signal: AbortSignal.timeout(12000) });
-  const outer = await res.json();
-  const data = JSON.parse(outer.contents);
+
+// タイムアウト付きfetch（AbortSignal.timeoutのブラウザ互換版）
+function fetchTimeout(url, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(t));
+}
+
+// Yahoo Finance JSONからデータを抽出する共通処理
+function parseYahooJson(data) {
   const result = data.chart.result[0];
   const meta = result.meta;
   const timestamps = result.timestamp || [];
   const closes = result.indicators.quote[0].close || [];
-  const history = timestamps.map((t, i) => ({
-    date: new Date(t * 1000).toISOString().slice(0, 10),
-    price: closes[i]
-  })).filter(d => d.price != null);
-  return { current: meta.regularMarketPrice, prevClose: meta.chartPreviousClose || meta.previousClose, history };
+  const history = timestamps
+    .map((t, i) => ({ date: new Date(t * 1000).toISOString().slice(0, 10), price: closes[i] }))
+    .filter(d => d.price != null);
+  return {
+    current: meta.regularMarketPrice,
+    prevClose: meta.chartPreviousClose || meta.previousClose,
+    history
+  };
+}
+
+async function fetchStockData(ticker) {
+  const q1 = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1y`;
+  const q2 = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1y`;
+  const TO = 10000; // 10秒タイムアウト
+
+  // 試みるプロキシ＋エンドポイントの組み合わせ（上から順に試す）
+  const attempts = [
+    // 1. allorigins /get + query1（JSON包み）
+    async () => {
+      const r = await fetchTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(q1)}`, TO);
+      if (!r.ok) throw new Error(`allorigins HTTP ${r.status}`);
+      const j = await r.json();
+      return parseYahooJson(JSON.parse(j.contents));
+    },
+    // 2. corsproxy.io + query1（直接JSON）
+    async () => {
+      const r = await fetchTimeout(`https://corsproxy.io/?${encodeURIComponent(q1)}`, TO);
+      if (!r.ok) throw new Error(`corsproxy HTTP ${r.status}`);
+      return parseYahooJson(await r.json());
+    },
+    // 3. allorigins /raw + query2
+    async () => {
+      const r = await fetchTimeout(`https://api.allorigins.win/raw?url=${encodeURIComponent(q2)}`, TO);
+      if (!r.ok) throw new Error(`allorigins-raw HTTP ${r.status}`);
+      return parseYahooJson(await r.json());
+    },
+    // 4. corsproxy.io + query2
+    async () => {
+      const r = await fetchTimeout(`https://corsproxy.io/?${encodeURIComponent(q2)}`, TO);
+      if (!r.ok) throw new Error(`corsproxy q2 HTTP ${r.status}`);
+      return parseYahooJson(await r.json());
+    },
+    // 5. thingproxy + query1
+    async () => {
+      const r = await fetchTimeout(`https://thingproxy.freeboard.io/fetch/${q1}`, TO);
+      if (!r.ok) throw new Error(`thingproxy HTTP ${r.status}`);
+      return parseYahooJson(await r.json());
+    },
+  ];
+
+  let lastErr;
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      const result = await attempts[i]();
+      console.info(`[Stock] ${ticker} OK (proxy ${i + 1})`);
+      return result;
+    } catch (e) {
+      lastErr = e;
+      console.warn(`[Stock] ${ticker} proxy ${i + 1} failed:`, e.message || e);
+    }
+  }
+  throw new Error(`[Stock] ${ticker} 全プロキシ失敗: ${lastErr?.message}`);
 }
 
 async function refreshStockPrices() {
-  setStockStatus('loading');
-  // Immediately apply cache so charts render right away while the network call runs
+  // ①キャッシュを即座に適用してチャートを先に描画する
   const cache = loadStockCache();
   if (cache && stockPrices.nikkeiHist.length === 0) {
     applyCacheToStockPrices(cache);
     if (!stockPrices.usdjpy) stockPrices.usdjpy = 150;
     setStockStatus('cache', stockPrices.cachedAt);
     renderAll();
+    refreshOpenDetailChart(); // モーダルが開いていれば即時描画
   }
+
+  setStockStatus('loading');
+
+  // ②バックグラウンドで最新データを取得
   try {
     const [nd, ad, fxd] = await Promise.all([
       fetchStockData('^N225'),
@@ -614,20 +680,29 @@ async function refreshStockPrices() {
     stockPrices.isCache = false; stockPrices.cachedAt = null;
     saveStockCache();
     setStockStatus('live');
-  } catch(e) {
-    console.warn('Stock fetch failed', e);
+    renderAll();
+    refreshOpenDetailChart(); // 新データでモーダルも更新
+  } catch (e) {
+    console.warn('[Stock] 全取得失敗:', e.message || e);
     if (stockPrices.nikkeiHist.length > 0) {
-      // Already showing cached data — just update status label
       setStockStatus('cache', stockPrices.cachedAt);
     } else {
-      // No cache at all — use hard fallbacks (no history available)
       setStockStatus('error');
       if (!stockPrices.nikkei) stockPrices.nikkei = 38000;
       if (!stockPrices.acwi) stockPrices.acwi = 115;
     }
+    renderAll();
   }
   if (!stockPrices.usdjpy) stockPrices.usdjpy = 150;
-  renderAll();
+}
+
+// 詳細モーダルが開いている場合、データ更新後にチャートを再描画する
+function refreshOpenDetailChart() {
+  if (!currentDetailAccount) return;
+  const modal = document.getElementById('detailModal');
+  if (!modal || !modal.classList.contains('show')) return;
+  if (detailChartInstance) { detailChartInstance.destroy(); detailChartInstance = null; }
+  requestAnimationFrame(() => requestAnimationFrame(() => buildDetailChart(currentDetailAccount)));
 }
 
 function setStockStatus(status, cachedAt) {
@@ -1179,13 +1254,13 @@ function doPartialWithdrawFifo(account, targetAmount, valueFn) {
 // DETAIL MODAL WITH CHART
 // ══════════════════════════════════════════════════════
 function openDetailModal(account) {
+  currentDetailAccount = account;
   if (detailChartInstance) { detailChartInstance.destroy(); detailChartInstance = null; }
   const titles = { bank:'🏦 パパ銀行 — 元金＋利子の推移', papa:'📈 パパ・インデックス — 日経平均チャート（過去1年）', mama:'🌍 ママ・インデックス — 全世界株式チャート（過去1年）' };
   document.getElementById('detailModalTitle').textContent = titles[account];
   document.getElementById('detailModalSubtitle').textContent = account === 'bank' ? '破線が元金、実線が利子込みの評価額です' : '🔺黄色の三角が購入時、●丸が現在の株価です';
   document.getElementById('detailInfo').innerHTML = '';
   document.getElementById('detailModal').classList.add('show');
-  // Double rAF ensures the modal is rendered and canvas has dimensions
   requestAnimationFrame(() => requestAnimationFrame(() => buildDetailChart(account)));
 }
 
@@ -1265,7 +1340,7 @@ function buildIndexDetailChart(ctx, account) {
   // ── ヒストリなし（キャッシュもない）の場合 ──
   if (rawHist.length === 0) {
     document.getElementById('detailInfo').innerHTML =
-      '<div class="empty-state"><span class="empty-icon">📡</span>株価データを取得中です。<br>しばらくしてからもう一度開いてください。</div>';
+      `<div class="empty-state"><span class="empty-icon">📡</span>株価データを取得中です…<br><button class="btn-save" style="margin-top:12px;font-size:0.8rem;padding:8px 18px;" onclick="refreshStockPrices()">🔄 再取得する</button></div>`;
     return;
   }
 
@@ -1619,7 +1694,10 @@ function switchTab(tab) {
 
 function closeModal(id) {
   document.getElementById(id).classList.remove('show');
-  if (id === 'detailModal' && detailChartInstance) { detailChartInstance.destroy(); detailChartInstance = null; }
+  if (id === 'detailModal') {
+    if (detailChartInstance) { detailChartInstance.destroy(); detailChartInstance = null; }
+    currentDetailAccount = null;
+  }
   currentDepositAccount = null;
   currentPwAccount = null;
 }
