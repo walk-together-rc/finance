@@ -136,28 +136,39 @@
     .diff-legend { background: #fce7f3; color: #be185d; }
 
     /* ─── PASSBOOK HISTORY ─── */
-    .passbook-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .passbook-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .passbook-title { font-size: 1rem; font-weight: bold; }
     .csv-btn { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; border-radius: 8px; padding: 8px 14px; font-size: 0.78rem; font-weight: bold; cursor: pointer; font-family: inherit; transition: all 0.15s; }
     .csv-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+    /* サマリー（利子＋総資産）はタイトル直下 */
+    .passbook-summary { display: flex; gap: 10px; justify-content: flex-end; margin-bottom: 10px; flex-wrap: wrap; }
+    .passbook-summary-item { background: white; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; font-size: 0.78rem; box-shadow: var(--shadow); white-space: nowrap; }
+    /* テーブル外枠 */
     .passbook-table-wrap { background: white; border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
-    .passbook-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-    .passbook-table thead th { background: #f8fafc; padding: 10px 8px; text-align: center; font-size: 0.72rem; color: var(--text-dim); font-weight: 600; border-bottom: 1px solid var(--border); }
-    .passbook-table thead th:first-child { text-align: left; padding-left: 12px; }
+    /* スクロール領域 */
+    .passbook-scroll { overflow-x: auto; overflow-y: auto; max-height: 62vh; -webkit-overflow-scrolling: touch; }
+    .passbook-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 480px; }
+    /* 粘着ヘッダー */
+    .passbook-table thead th { position: sticky; top: 0; z-index: 2; background: #f8fafc; padding: 10px 8px; text-align: right; font-size: 0.72rem; color: var(--text-dim); font-weight: 600; border-bottom: 2px solid var(--border); white-space: nowrap; }
+    .passbook-table thead th:first-child { text-align: left; padding-left: 10px; }
+    .passbook-table thead th:last-child { text-align: left; padding-right: 10px; }
     .passbook-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.1s; }
     .passbook-table tbody tr:hover { background: #fafafa; }
     .passbook-table tbody tr:last-child { border-bottom: none; }
-    .passbook-table tbody td { padding: 9px 8px; vertical-align: middle; }
-    .pb-date { font-size: 0.72rem; color: var(--text-dim); white-space: nowrap; padding-left: 12px !important; }
-    .pb-desc { color: var(--text); }
-    .pb-desc-sub { font-size: 0.68rem; color: var(--text-dim); margin-top: 1px; }
-    .pb-out { color: var(--danger); font-weight: bold; text-align: right; }
-    .pb-in { color: var(--success); font-weight: bold; text-align: right; }
-    .pb-balance { font-weight: bold; color: var(--text); text-align: right; padding-right: 12px !important; }
+    .passbook-table tbody td { padding: 8px 8px; vertical-align: middle; }
+    /* 日付：年／月日の2行 */
+    .pb-date { font-size: 0.68rem; color: var(--text-dim); padding-left: 10px !important; line-height: 1.5; white-space: nowrap; }
+    .pb-date-year { display: block; }
+    .pb-date-day  { display: block; font-weight: 600; color: var(--text); }
+    /* 金額セル：折り返し禁止 */
+    .pb-out { color: var(--danger); font-weight: bold; text-align: right; white-space: nowrap; }
+    .pb-in  { color: var(--success); font-weight: bold; text-align: right; white-space: nowrap; }
+    .pb-balance { font-weight: bold; color: var(--text); text-align: right; white-space: nowrap; }
+    /* 内容（最終列） */
+    .pb-desc { color: var(--text); font-size: 0.78rem; padding-right: 10px !important; min-width: 130px; }
+    .pb-desc-sub { font-size: 0.66rem; color: var(--text-dim); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
     .pb-interest-row td { background: #fffbeb; }
     .pb-interest-row .pb-in { color: #d97706; }
-    .passbook-footer { background: #f8fafc; padding: 12px; border-top: 2px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; }
-    .passbook-footer strong { color: var(--text); }
 
     /* ─── MODAL ─── */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; align-items: center; justify-content: center; padding: 16px; }
@@ -246,7 +257,8 @@
 
 <!-- ══════════ NET WORTH ══════════ -->
 <div class="net-worth-section" style="position:relative;">
-  <div class="nw-label">💼 ぜんぶあわせた資産</div>
+  <button class="info-btn" onclick="document.getElementById('infoModal').classList.add('show')" title="お金を増やす方法を見る">i</button>
+  <div class="nw-label">ぜんぶあわせた資産</div>
   <div class="nw-amount" id="netWorthAmount">¥0</div>
   <div class="nw-profit" id="netWorthProfit"></div>
   <div class="nw-breakdown">
@@ -380,24 +392,27 @@
       <div class="passbook-title">📒 お金の通帳</div>
       <button class="csv-btn" onclick="exportCSV()">📥 CSV出力</button>
     </div>
+    <!-- サマリー：タイトル直下 -->
+    <div class="passbook-summary" id="passbookSummary" style="display:none">
+      <div class="passbook-summary-item">💰 利子（確定分）: <strong id="footerInterest" style="color:#d97706">+¥0</strong></div>
+      <div class="passbook-summary-item">現在の総資産: <strong id="footerTotal" style="color:#1e293b">¥0</strong></div>
+    </div>
     <div class="passbook-table-wrap">
-      <table class="passbook-table" id="passbookTable">
-        <thead>
-          <tr>
-            <th>日付</th>
-            <th>内容</th>
-            <th>出金（−）</th>
-            <th>入金（＋）</th>
-            <th>元金残高</th>
-          </tr>
-        </thead>
-        <tbody id="passbookBody">
-          <tr><td colspan="5" class="empty-state"><span class="empty-icon">📭</span>まだ取引がありません</td></tr>
-        </tbody>
-      </table>
-      <div class="passbook-footer" id="passbookFooter" style="display:none">
-        <span>💰 利子（確定分）: <strong id="footerInterest" style="color:#d97706">+¥0</strong></span>
-        <span>現在の総資産: <strong id="footerTotal" style="color:#1e293b">¥0</strong></span>
+      <div class="passbook-scroll">
+        <table class="passbook-table" id="passbookTable">
+          <thead>
+            <tr>
+              <th style="text-align:left;">日付</th>
+              <th>出金（−）</th>
+              <th>入金（＋）</th>
+              <th>元金残高</th>
+              <th style="text-align:left;">内容</th>
+            </tr>
+          </thead>
+          <tbody id="passbookBody">
+            <tr><td colspan="5"><div class="empty-state"><span class="empty-icon">📭</span>まだ取引がありません</div></td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -1026,39 +1041,53 @@ function renderBadges() {
 }
 
 function renderHistory() {
-  const allTx = [...appData.history].sort((a,b) => a.date.localeCompare(b.date) || (a.seq||0) - (b.seq||0));
   const tbody = document.getElementById('passbookBody');
-  const footer = document.getElementById('passbookFooter');
+  const summary = document.getElementById('passbookSummary');
+
+  // まず古い順に並べて残高を計算し、その後逆順で表示
+  const allTx = [...appData.history].sort((a,b) => a.date.localeCompare(b.date) || (a.seq||0) - (b.seq||0));
+
   if (allTx.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><span class="empty-icon">📭</span>まだ取引がありません</div></td></tr>';
-    footer.style.display = 'none';
+    summary.style.display = 'none';
     return;
   }
+
   const typeLabel = {
     bank_dep:'🏦 パパ銀行 預け入れ', bank_wth:'🏦 パパ銀行 引き出し',
     papa_dep:'📈 パパ・インデックス 購入', papa_wth:'📈 パパ・インデックス 売却',
     mama_dep:'🌍 ママ・インデックス 購入', mama_wth:'🌍 ママ・インデックス 売却',
     bank_int:'💰 パパ銀行 利子'
   };
-  const tagEl = { bank_dep:'tag-bank', bank_wth:'tag-bank', papa_dep:'tag-papa', papa_wth:'tag-papa', mama_dep:'tag-mama', mama_wth:'tag-mama', bank_int:'tag-interest' };
-  let runBalance = 0;
-  let html = '';
-  for (const tx of allTx) {
+  const tagCls = { bank_dep:'tag-bank', bank_wth:'tag-bank', papa_dep:'tag-papa', papa_wth:'tag-papa', mama_dep:'tag-mama', mama_wth:'tag-mama', bank_int:'tag-interest' };
+
+  // 各行の残高を前向きに計算
+  let runBal = 0;
+  const rows = allTx.map(tx => {
     const isIn = tx.type.endsWith('_dep') || tx.type === 'bank_int';
-    if (isIn) runBalance += tx.amount; else runBalance -= tx.amount;
-    const tag = `<span class="tag ${tagEl[tx.type]||'tag-bank'}">${typeLabel[tx.type]||tx.type}</span>`;
+    if (isIn) runBal += tx.amount; else runBal -= tx.amount;
+    return { tx, isIn, balance: runBal };
+  });
+
+  // 最新順に逆転して描画
+  let html = '';
+  for (const { tx, isIn, balance } of [...rows].reverse()) {
+    const parts = tx.date.split('-'); // ['2024','04','01']
+    const dateHtml = `<span class="pb-date-year">${parts[0]}</span><span class="pb-date-day">${parts[1]}/${parts[2]}</span>`;
+    const tag = `<span class="tag ${tagCls[tx.type]||'tag-bank'}">${typeLabel[tx.type]||tx.type}</span>`;
     const outCell = isIn ? '<td class="pb-out">—</td>' : `<td class="pb-out">−${fmt(tx.amount)}</td>`;
-    const inCell = isIn ? `<td class="pb-in">＋${fmt(tx.amount)}</td>` : '<td class="pb-in">—</td>';
-    const intClass = tx.type === 'bank_int' ? ' class="pb-interest-row"' : '';
-    html += `<tr${intClass}>
-      <td class="pb-date">${tx.date.replace(/-/g,'/')}</td>
-      <td class="pb-desc">${tag}${tx.note ? `<div class="pb-desc-sub">${tx.note}</div>` : ''}</td>
+    const inCell  = isIn ? `<td class="pb-in">＋${fmt(tx.amount)}</td>` : '<td class="pb-in">—</td>';
+    const intCls  = tx.type === 'bank_int' ? ' class="pb-interest-row"' : '';
+    html += `<tr${intCls}>
+      <td class="pb-date">${dateHtml}</td>
       ${outCell}${inCell}
-      <td class="pb-balance">${fmt(runBalance)}</td>
+      <td class="pb-balance">${fmt(balance)}</td>
+      <td class="pb-desc">${tag}${tx.note ? `<div class="pb-desc-sub">${tx.note}</div>` : ''}</td>
     </tr>`;
   }
   tbody.innerHTML = html;
-  footer.style.display = 'flex';
+
+  summary.style.display = 'flex';
   const nw = calcNetWorth();
   document.getElementById('footerInterest').textContent = '+' + fmt(nw.bank.interest);
   document.getElementById('footerTotal').textContent = fmt(nw.total);
