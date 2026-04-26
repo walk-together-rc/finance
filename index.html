@@ -247,11 +247,6 @@
   <div class="player-bar">
     <span class="child-name" id="childNameDisplay">こどもちゃん</span>
     <span class="level-badge" id="levelBadge">Lv.1 おこづかい見習い</span>
-    <div class="xp-area">
-      <div class="xp-bar"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
-      <span class="xp-label" id="xpLabel">0 XP</span>
-    </div>
-    <span class="streak-badge" id="streakBadge">🔥 0日</span>
   </div>
 </div>
 
@@ -280,7 +275,7 @@
 <!-- ══════════ TABS ══════════ -->
 <div class="tabs">
   <div class="tab active" onclick="switchTab('home')"><span class="tab-icon">🏠</span>ホーム</div>
-  <div class="tab" onclick="switchTab('history')"><span class="tab-icon">📒</span>通帳</div>
+  <div class="tab" onclick="switchTab('history')"><span class="tab-icon">📒</span>取引履歴</div>
   <div class="tab" onclick="switchTab('badges')"><span class="tab-icon">🏅</span>獲得バッジ</div>
   <div class="tab" onclick="switchTab('settings')"><span class="tab-icon">⚙️</span>設定</div>
 </div>
@@ -389,13 +384,8 @@
   <!-- HISTORY TAB -->
   <div class="tab-panel" id="panel-history">
     <div class="passbook-header">
-      <div class="passbook-title">📒 お金の通帳</div>
+      <div class="passbook-title">📒 取引履歴</div>
       <button class="csv-btn" onclick="exportCSV()">📥 CSV出力</button>
-    </div>
-    <!-- サマリー：タイトル直下 -->
-    <div class="passbook-summary" id="passbookSummary" style="display:none">
-      <div class="passbook-summary-item">💰 利子（確定分）: <strong id="footerInterest" style="color:#d97706">+¥0</strong></div>
-      <div class="passbook-summary-item">現在の総資産: <strong id="footerTotal" style="color:#1e293b">¥0</strong></div>
     </div>
     <div class="passbook-table-wrap">
       <div class="passbook-scroll">
@@ -403,14 +393,12 @@
           <thead>
             <tr>
               <th style="text-align:left;">日付</th>
-              <th>出金（−）</th>
-              <th>入金（＋）</th>
-              <th>元金残高</th>
+              <th style="text-align:right;">金額</th>
               <th style="text-align:left;">内容</th>
             </tr>
           </thead>
           <tbody id="passbookBody">
-            <tr><td colspan="5"><div class="empty-state"><span class="empty-icon">📭</span>まだ取引がありません</div></td></tr>
+            <tr><td colspan="3"><div class="empty-state"><span class="empty-icon">📭</span>まだ取引がありません</div></td></tr>
           </tbody>
         </table>
       </div>
@@ -883,6 +871,7 @@ function addXP(amount) {
 function checkAndAwardBadge(id) {
   if (appData.gamification.badges.includes(id)) return false;
   appData.gamification.badges.push(id);
+  saveData(); // 獲得済みフラグを即保存してリロード時の再表示を防ぐ
   const b = ALL_BADGES.find(b => b.id === id);
   if (b) showAchievement(`🏅 バッジ獲得: ${b.emoji} ${b.name}`);
   return true;
@@ -982,9 +971,6 @@ function renderHeader() {
   const prog = getLevelProgress(g.xp);
   document.getElementById('childNameDisplay').textContent = appData.settings.childName || 'こどもちゃん';
   document.getElementById('levelBadge').textContent = `Lv.${lv.index+1} ${lv.name}`;
-  document.getElementById('xpFill').style.width = prog.pct + '%';
-  document.getElementById('xpLabel').textContent = g.xp + ' XP';
-  document.getElementById('streakBadge').textContent = `🔥 ${g.streak||0}日`;
 }
 
 function renderNetWorth() {
@@ -1037,7 +1023,6 @@ function renderBadges() {
 
 function renderHistory() {
   const tbody = document.getElementById('passbookBody');
-  const summary = document.getElementById('passbookSummary');
 
   // まず古い順に並べて残高を計算し、その後逆順で表示
   const allTx = [...appData.history].sort((a,b) => a.date.localeCompare(b.date) || (a.seq||0) - (b.seq||0));
@@ -1056,58 +1041,24 @@ function renderHistory() {
   };
   const tagCls = { bank_dep:'tag-bank', bank_wth:'tag-bank', papa_dep:'tag-papa', papa_wth:'tag-papa', mama_dep:'tag-mama', mama_wth:'tag-mama', bank_int:'tag-interest' };
 
-  // 各行の残高を前向きに計算（元金残高ベース）
-  let runBal = 0;
-  const rows = allTx.map(tx => {
-    const isWth = tx.type.endsWith('_wth');
-    const isIn  = tx.type.endsWith('_dep') || tx.type === 'bank_int';
-    if (isIn) {
-      runBal += tx.amount;
-    } else if (isWth) {
-      // 新形式: principalOut フィールドがある場合は元金部分だけ減算
-      // 旧形式: amount 全額を減算
-      const principalOut = tx.principalOut !== undefined ? tx.principalOut : tx.amount;
-      runBal -= principalOut;
-    }
-    return { tx, isIn, isWth, balance: Math.max(0, runBal) }; // 丸め誤差でマイナスになる場合も 0 に
-  });
-
-  // 最新順に逆転して描画
+  // 最新順に描画（金額1列）
   let html = '';
-  for (const { tx, isIn, isWth, balance } of [...rows].reverse()) {
-    const parts = tx.date.split('-'); // ['2024','04','01']
+  for (const tx of [...allTx].reverse()) {
+    const isIn = tx.type.endsWith('_dep') || tx.type === 'bank_int';
+    const parts = tx.date.split('-');
     const dateHtml = `<span class="pb-date-year">${parts[0]}</span><span class="pb-date-day">${parts[1]}/${parts[2]}</span>`;
     const tag = `<span class="tag ${tagCls[tx.type]||'tag-bank'}">${typeLabel[tx.type]||tx.type}</span>`;
-
-    let outCell, inCell;
-    if (isWth && tx.principalOut !== undefined) {
-      // 新形式: 元金を出金欄、利益/利息を入金欄に分離表示
-      outCell = `<td class="pb-out">−${fmt(tx.principalOut)}</td>`;
-      inCell  = tx.gain > 0
-        ? `<td class="pb-in">＋${fmt(tx.gain)}</td>`
-        : '<td class="pb-in">—</td>';
-    } else if (isIn) {
-      outCell = '<td class="pb-out">—</td>';
-      inCell  = `<td class="pb-in">＋${fmt(tx.amount)}</td>`;
-    } else {
-      outCell = `<td class="pb-out">−${fmt(tx.amount)}</td>`;
-      inCell  = '<td class="pb-in">—</td>';
-    }
-
+    const amtCell = isIn
+      ? `<td class="pb-in">＋${fmt(tx.amount)}</td>`
+      : `<td class="pb-out">−${fmt(tx.amount)}</td>`;
     const intCls = tx.type === 'bank_int' ? ' class="pb-interest-row"' : '';
     html += `<tr${intCls}>
       <td class="pb-date">${dateHtml}</td>
-      ${outCell}${inCell}
-      <td class="pb-balance">${fmt(balance)}</td>
+      ${amtCell}
       <td class="pb-desc">${tag}${tx.note ? `<div class="pb-desc-sub">${tx.note}</div>` : ''}</td>
     </tr>`;
   }
   tbody.innerHTML = html;
-
-  summary.style.display = 'flex';
-  const nw = calcNetWorth();
-  document.getElementById('footerInterest').textContent = '+' + fmt(nw.bank.interest);
-  document.getElementById('footerTotal').textContent = fmt(nw.total);
 }
 
 function renderCompoundTimeline() {
@@ -1173,14 +1124,12 @@ function confirmDeposit() {
     appData.bank.deposits.push({ id, date: today, amount, note });
     addHistoryEntry({ type:'bank_dep', date: today, amount, note, seq });
     addXP(20);
-    showAchievement('🏦 パパ銀行に預けました！ +20XP');
   } else {
     const price = currentDepositAccount === 'papa' ? stockPrices.nikkei : stockPrices.acwi;
     if (!price) { alert('株価データが取得できていません。設定から手動入力してください。'); return; }
     appData[currentDepositAccount].deposits.push({ id, date: today, amount, price, note });
     addHistoryEntry({ type: currentDepositAccount+'_dep', date: today, amount, price, note, seq });
     addXP(25);
-    showAchievement(`${currentDepositAccount === 'papa' ? '📈 パパ・インデックス' : '🌍 ママ・インデックス'}を買いました！ +25XP`);
   }
   saveData();
   closeModal('depositModal');
@@ -1265,25 +1214,12 @@ function confirmPartialWithdraw() {
   // Check if withdrawing with profit
   if (profitWithdrawn > 0) checkAndAwardBadge('withdraw_profit');
 
-  // 元金と利益・損益を分離して記録（通帳の残高がマイナスにならないようにするため）
-  const principal_before = account === 'bank' ? nw.bank.principal : (account === 'papa' ? nw.papa.principal : nw.mama.principal);
-  const principalPortion = Math.round(principal_before * pct);
-  const gainPortion = Math.round(withdrawAmt) - principalPortion; // 正: 利益/利息、負: 損失
-
   const isSell = (account === 'papa' || account === 'mama');
   const actionWord = isSell ? '売却' : '引き出し';
-  addHistoryEntry({
-    type: account+'_wth', date: today,
-    amount: Math.round(withdrawAmt),         // 総引き出し額（CSV用）
-    principalOut: principalPortion,           // 元金返還分
-    gain: gainPortion > 0 ? gainPortion : 0, // 利益・利息分（正のみ記録）
-    note: `¥${Math.round(withdrawAmt).toLocaleString()} ${actionWord}`,
-    seq: appData.history.length
-  });
+  addHistoryEntry({ type: account+'_wth', date: today, amount: withdrawAmt, note: `¥${Math.round(withdrawAmt).toLocaleString()} ${actionWord}`, seq: appData.history.length });
   addXP(15);
   saveData();
   closeModal('partialWithdrawModal');
-  showAchievement(isSell ? `💸 ${fmt(withdrawAmt)} を売りました！ +15XP` : `💸 ${fmt(withdrawAmt)} を引き出しました！ +15XP`);
   renderAll();
 }
 
@@ -1542,7 +1478,6 @@ function saveSettings() {
   const name = document.getElementById('settingChildName').value.trim();
   if (name) appData.settings.childName = name;
   saveData(); renderAll();
-  showAchievement('💾 設定を保存しました！');
 }
 
 function applyManualPrices() {
@@ -1554,7 +1489,6 @@ function applyManualPrices() {
     const el = document.getElementById(id);
     if (el) { el.textContent = '✏️ 手動'; el.className = 'stock-live'; }
   });
-  showAchievement('📊 株価を更新しました');
   renderAll();
 }
 
@@ -1562,7 +1496,6 @@ function resetData() {
   if (!confirm('⚠️ 全てのデータをリセットしますか？\nこの操作は取り消せません！')) return;
   appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
   saveData(); renderAll();
-  showAchievement('🗑️ データをリセットしました');
 }
 
 // ══════════════════════════════════════════════════════
@@ -1740,7 +1673,6 @@ function confirmImport() {
   saveData();
   renderAll();
   clearImport();
-  showAchievement(`✅ ${imported}件の取引をインポートしました！ +${imported * 5}XP`);
 }
 
 // ══════════════════════════════════════════════════════
