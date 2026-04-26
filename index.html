@@ -1056,23 +1056,45 @@ function renderHistory() {
   };
   const tagCls = { bank_dep:'tag-bank', bank_wth:'tag-bank', papa_dep:'tag-papa', papa_wth:'tag-papa', mama_dep:'tag-mama', mama_wth:'tag-mama', bank_int:'tag-interest' };
 
-  // 各行の残高を前向きに計算
+  // 各行の残高を前向きに計算（元金残高ベース）
   let runBal = 0;
   const rows = allTx.map(tx => {
-    const isIn = tx.type.endsWith('_dep') || tx.type === 'bank_int';
-    if (isIn) runBal += tx.amount; else runBal -= tx.amount;
-    return { tx, isIn, balance: runBal };
+    const isWth = tx.type.endsWith('_wth');
+    const isIn  = tx.type.endsWith('_dep') || tx.type === 'bank_int';
+    if (isIn) {
+      runBal += tx.amount;
+    } else if (isWth) {
+      // 新形式: principalOut フィールドがある場合は元金部分だけ減算
+      // 旧形式: amount 全額を減算
+      const principalOut = tx.principalOut !== undefined ? tx.principalOut : tx.amount;
+      runBal -= principalOut;
+    }
+    return { tx, isIn, isWth, balance: Math.max(0, runBal) }; // 丸め誤差でマイナスになる場合も 0 に
   });
 
   // 最新順に逆転して描画
   let html = '';
-  for (const { tx, isIn, balance } of [...rows].reverse()) {
+  for (const { tx, isIn, isWth, balance } of [...rows].reverse()) {
     const parts = tx.date.split('-'); // ['2024','04','01']
     const dateHtml = `<span class="pb-date-year">${parts[0]}</span><span class="pb-date-day">${parts[1]}/${parts[2]}</span>`;
     const tag = `<span class="tag ${tagCls[tx.type]||'tag-bank'}">${typeLabel[tx.type]||tx.type}</span>`;
-    const outCell = isIn ? '<td class="pb-out">—</td>' : `<td class="pb-out">−${fmt(tx.amount)}</td>`;
-    const inCell  = isIn ? `<td class="pb-in">＋${fmt(tx.amount)}</td>` : '<td class="pb-in">—</td>';
-    const intCls  = tx.type === 'bank_int' ? ' class="pb-interest-row"' : '';
+
+    let outCell, inCell;
+    if (isWth && tx.principalOut !== undefined) {
+      // 新形式: 元金を出金欄、利益/利息を入金欄に分離表示
+      outCell = `<td class="pb-out">−${fmt(tx.principalOut)}</td>`;
+      inCell  = tx.gain > 0
+        ? `<td class="pb-in">＋${fmt(tx.gain)}</td>`
+        : '<td class="pb-in">—</td>';
+    } else if (isIn) {
+      outCell = '<td class="pb-out">—</td>';
+      inCell  = `<td class="pb-in">＋${fmt(tx.amount)}</td>`;
+    } else {
+      outCell = `<td class="pb-out">−${fmt(tx.amount)}</td>`;
+      inCell  = '<td class="pb-in">—</td>';
+    }
+
+    const intCls = tx.type === 'bank_int' ? ' class="pb-interest-row"' : '';
     html += `<tr${intCls}>
       <td class="pb-date">${dateHtml}</td>
       ${outCell}${inCell}
@@ -1243,9 +1265,21 @@ function confirmPartialWithdraw() {
   // Check if withdrawing with profit
   if (profitWithdrawn > 0) checkAndAwardBadge('withdraw_profit');
 
+  // 元金と利益・損益を分離して記録（通帳の残高がマイナスにならないようにするため）
+  const principal_before = account === 'bank' ? nw.bank.principal : (account === 'papa' ? nw.papa.principal : nw.mama.principal);
+  const principalPortion = Math.round(principal_before * pct);
+  const gainPortion = Math.round(withdrawAmt) - principalPortion; // 正: 利益/利息、負: 損失
+
   const isSell = (account === 'papa' || account === 'mama');
   const actionWord = isSell ? '売却' : '引き出し';
-  addHistoryEntry({ type: account+'_wth', date: today, amount: withdrawAmt, note: `¥${Math.round(withdrawAmt).toLocaleString()} ${actionWord}`, seq: appData.history.length });
+  addHistoryEntry({
+    type: account+'_wth', date: today,
+    amount: Math.round(withdrawAmt),         // 総引き出し額（CSV用）
+    principalOut: principalPortion,           // 元金返還分
+    gain: gainPortion > 0 ? gainPortion : 0, // 利益・利息分（正のみ記録）
+    note: `¥${Math.round(withdrawAmt).toLocaleString()} ${actionWord}`,
+    seq: appData.history.length
+  });
   addXP(15);
   saveData();
   closeModal('partialWithdrawModal');
@@ -1372,14 +1406,42 @@ function buildIndexDetailChart(ctx, account) {
   const priceData = hist.map(h => h.price);
   const todayIdx = hist.length - 1;
 
-  // ── 現在マーカーの色を事前計算 ──
+  // ── マーカー用配列を初期化 ──
+  const ptStyle  = priceData.map(() => 'circle');
+  const ptRadius = priceData.map(() => 0);
+  const ptBg     = priceData.map(() => 'transparent');
+  const ptBorder = priceData.map(() => 'transparent');
+  const ptBorderW= priceData.map(() => 0);
+  const ptHover  = priceData.map(() => 4);
+
+  // ── 現在マーカー（●丸・最終点） ──
   const totalProfit = rawCurrentPrice && activeDeps.length > 0
     ? activeDeps.reduce((s, d) => s + (indexCurrentValue(d, rawCurrentPrice) - d.amount), 0)
     : 0;
   const markerBg     = activeDeps.length === 0 ? '#64748b' : (totalProfit >= 0 ? '#16a34a' : '#dc2626');
   const markerBorder = activeDeps.length === 0 ? '#334155' : (totalProfit >= 0 ? '#14532d' : '#7f1d1d');
+  ptStyle[todayIdx]  = 'circle';
+  ptRadius[todayIdx] = 10;
+  ptBg[todayIdx]     = markerBg;
+  ptBorder[todayIdx] = markerBorder;
+  ptBorderW[todayIdx]= 2;
+  ptHover[todayIdx]  = 13;
 
-  // ── 折れ線（最終点に丸を埋め込む → 確実に線上に重なる） ──
+  // ── 購入マーカー（🔺三角・購入日の折れ線上） ──
+  const buyInfoMap = {}; // histIdx → tooltip文字列
+  for (const dep of activeDeps) {
+    const histIdx = hist.findIndex(h => h.date >= dep.date);
+    if (histIdx < 0 || histIdx === todayIdx) continue;
+    ptStyle[histIdx]  = 'triangle';
+    ptRadius[histIdx] = 9;
+    ptBg[histIdx]     = '#f59e0b';
+    ptBorder[histIdx] = '#92400e';
+    ptBorderW[histIdx]= 1.5;
+    ptHover[histIdx]  = 12;
+    buyInfoMap[histIdx] = `🔺 購入 ${dep.date.slice(5)}（${fmt(dep.amount)}）`;
+  }
+
+  // ── 折れ線（マーカーをすべて1データセットに埋め込む） ──
   const datasets = [
     {
       label: account === 'papa' ? '日経平均（円）' : '全世界株式（円）',
@@ -1387,28 +1449,14 @@ function buildIndexDetailChart(ctx, account) {
       borderColor: color,
       backgroundColor: color + '18',
       fill: true, tension: 0.3, borderWidth: 2,
-      pointRadius:          priceData.map((_, i) => i === todayIdx ? 10 : 0),
-      pointBackgroundColor: priceData.map((_, i) => i === todayIdx ? markerBg     : 'transparent'),
-      pointBorderColor:     priceData.map((_, i) => i === todayIdx ? markerBorder : 'transparent'),
-      pointBorderWidth:     priceData.map((_, i) => i === todayIdx ? 2 : 0),
-      pointHoverRadius:     priceData.map((_, i) => i === todayIdx ? 13 : 4),
+      pointStyle:           ptStyle,
+      pointRadius:          ptRadius,
+      pointBackgroundColor: ptBg,
+      pointBorderColor:     ptBorder,
+      pointBorderWidth:     ptBorderW,
+      pointHoverRadius:     ptHover,
     }
   ];
-
-  // ── 購入マーカー（scatter: 三角） ──
-  for (const dep of activeDeps) {
-    const histIdx = hist.findIndex(h => h.date >= dep.date);
-    if (histIdx < 0) continue;
-    const buyPriceYen = dep.price;
-    datasets.push({
-      type: 'scatter',
-      label: `購入時 ${dep.date.slice(5)}（${fmt(dep.amount)}）`,
-      data: [{ x: hist[histIdx].date.slice(5), y: buyPriceYen }],
-      backgroundColor: '#f59e0b',
-      pointRadius: 9, pointStyle: 'triangle',
-      borderColor: '#92400e', borderWidth: 1.5
-    });
-  }
 
   detailChartInstance = new Chart(ctx, {
     type: 'line',
@@ -1417,14 +1465,14 @@ function buildIndexDetailChart(ctx, account) {
       responsive: true, maintainAspectRatio: false,
       animation: { duration: 400 },
       plugins: {
-        legend: {
-          labels: { font: { size: 10 }, color: '#475569' }
-        },
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label: c => {
-              if (c.dataset.type === 'scatter') return c.dataset.label;
-              return c.dataset.label + ': ¥' + Math.round(c.raw).toLocaleString('ja-JP');
+              const idx = c.dataIndex;
+              if (buyInfoMap[idx]) return buyInfoMap[idx];
+              if (idx === todayIdx) return `● 現在: ¥${Math.round(c.raw).toLocaleString('ja-JP')}`;
+              return `¥${Math.round(c.raw).toLocaleString('ja-JP')}`;
             }
           }
         }
