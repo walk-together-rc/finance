@@ -292,7 +292,7 @@
       <div class="card-header">
         <div>
           <div class="card-title"><span class="card-icon">🏦</span>パパ銀行</div>
-          <div class="card-subtitle">年利 5%・毎日複利で増える！</div>
+          <div class="card-subtitle">年利 5%</div>
         </div>
         <div class="card-value bank" id="homeBank">¥0</div>
       </div>
@@ -465,7 +465,7 @@
     <h3>💡 お金を増やす方法</h3>
     <div class="info-modal-body">
       <div style="font-size:0.86rem;line-height:1.85;color:var(--text);margin-bottom:20px;">
-        🏦 <strong>パパ銀行</strong>…年5%の利子が毎日つく。長く預けるほど複利でどんどん増える！<br>
+        🏦 <strong>パパ銀行</strong>…年5%の利子が毎日つく。<br>
         📈 <strong>パパ・インデックス</strong>…日経平均（日本の株）に連動してお金が増えたり減ったりする！<br>
         🌍 <strong>ママ・インデックス</strong>…オルカン（世界中の株）に連動してお金が増えたり減ったりする！
       </div>
@@ -1092,7 +1092,7 @@ function openDepositModal(account) {
   currentDepositAccount = account;
   const titles = { bank:'🏦 パパ銀行に預ける', papa:'📈 パパ・インデックスを買う', mama:'🌍 ママ・インデックスを買う' };
   const subs = {
-    bank:'年利5%・複利で毎日増えます。長く預けるほどお得！',
+    bank:'年利5%の利子が毎日つく。',
     papa:`日経平均連動。現在: ${stockPrices.nikkei ? fmtN(stockPrices.nikkei,0)+'円' : '---（設定から手動入力）'}`,
     mama:`全世界株式連動。現在: ${stockPrices.acwi ? fmtN(stockPrices.acwi,0)+'円' : '---（設定から手動入力）'}`
   };
