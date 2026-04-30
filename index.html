@@ -40,14 +40,19 @@
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
       letter-spacing: 0.04em;
     }
-    .player-bar { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 9px; flex-wrap: wrap; }
-    .child-name { font-size: 0.92rem; font-weight: bold; color: var(--text); }
-    .level-badge { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; font-weight: bold; padding: 4px 11px; border-radius: 20px; font-size: 0.78rem; white-space: nowrap; }
-    .xp-area { display: flex; align-items: center; gap: 6px; flex: 1; max-width: 150px; }
-    .xp-bar { flex: 1; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
-    .xp-fill { height: 100%; background: linear-gradient(90deg, #f59e0b, #d97706); border-radius: 4px; transition: width 0.6s ease; }
-    .xp-label { font-size: 0.68rem; color: var(--text-dim); white-space: nowrap; }
-    .streak-badge { font-size: 0.78rem; background: #fff7ed; border: 1px solid #fed7aa; padding: 3px 9px; border-radius: 10px; color: #d97706; }
+    /* ─── ACCOUNT SWITCHER ─── */
+    .account-switcher { position: relative; overflow: hidden; margin-top: 8px; padding: 2px 0; }
+    .account-switcher::before,
+    .account-switcher::after { content:''; position:absolute; top:0; bottom:0; width:36px; z-index:3; pointer-events:none; }
+    .account-switcher::before { left:0;  background:linear-gradient(to right, var(--switcher-fade, rgba(255,255,255,0.92)), transparent); }
+    .account-switcher::after  { right:0; background:linear-gradient(to left,  var(--switcher-fade, rgba(255,255,255,0.92)), transparent); }
+    .account-track { display:flex; align-items:center; gap:8px; transition:transform 0.32s cubic-bezier(0.4,0,0.2,1); padding:3px 48px; will-change:transform; }
+    .account-chip { flex-shrink:0; padding:5px 16px; border-radius:20px; font-size:0.82rem; font-weight:bold; cursor:pointer; transition:all 0.25s ease; white-space:nowrap; user-select:none; -webkit-user-select:none; }
+    .account-chip.active { color:white; box-shadow:0 2px 8px rgba(0,0,0,0.18); transform:scale(1.0); }
+    .account-chip.inactive { background:#e9edf2; color:#9fb3c8; transform:scale(0.88); opacity:0.7; }
+    .account-chip.inactive:hover { opacity:1; transform:scale(0.93); }
+    .account-add-btn { flex-shrink:0; width:28px; height:28px; border-radius:50%; background:#e9edf2; color:#64748b; font-size:1.1rem; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; border:none; transition:all 0.2s; padding:0; }
+    .account-add-btn:hover { background:#cbd5e1; color:#334155; }
 
     /* ─── NET WORTH ─── */
     .net-worth-section { background: linear-gradient(135deg, #fffbeb, #fff0f9, #eff6ff); padding: 20px; text-align: center; border-bottom: 1px solid var(--border); }
@@ -245,14 +250,13 @@
 <!-- ══════════ HEADER ══════════ -->
 <div class="header">
   <h1>💰 ファミリーバンク</h1>
-  <div class="player-bar">
-    <span class="child-name" id="childNameDisplay">こどもちゃん</span>
-    <span class="level-badge" id="levelBadge">Lv.1 おこづかい見習い</span>
+  <div class="account-switcher" id="accountSwitcher">
+    <div class="account-track" id="accountTrack"><!-- JS描画 --></div>
   </div>
 </div>
 
 <!-- ══════════ NET WORTH ══════════ -->
-<div class="net-worth-section" style="position:relative;">
+<div class="net-worth-section" id="netWorthSection" style="position:relative;">
   <button class="info-btn" onclick="document.getElementById('infoModal').classList.add('show')" title="お金を増やす方法を見る">i</button>
   <div class="nw-label">ぜんぶあわせた資産</div>
   <div class="nw-amount" id="netWorthAmount">¥0</div>
@@ -292,7 +296,7 @@
       <div class="card-header">
         <div>
           <div class="card-title"><span class="card-icon">🏦</span>パパ銀行</div>
-          <div class="card-subtitle">年利 5%</div>
+          <div class="card-subtitle">年利 5%・毎日複利で増える！</div>
         </div>
         <div class="card-value bank" id="homeBank">¥0</div>
       </div>
@@ -450,8 +454,13 @@
     </div>
     <div class="settings-card">
       <h3>🗑️ データ管理</h3>
-      <p style="font-size:0.76rem;color:var(--text-dim);margin-bottom:12px;">⚠️ リセットすると全てのデータが削除されます</p>
-      <button class="btn" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;font-family:inherit;" onclick="resetData()">🗑️ 全データをリセット</button>
+      <p id="resetDataDesc" style="font-size:0.76rem;color:var(--text-dim);margin-bottom:12px;"></p>
+      <button class="btn" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;font-family:inherit;" onclick="resetData()">データをリセットする</button>
+    </div>
+    <div class="settings-card">
+      <h3>👤 アカウント削除</h3>
+      <p id="deleteAccountDesc" style="font-size:0.76rem;color:var(--text-dim);margin-bottom:12px;"></p>
+      <button id="deleteAccountBtn" class="btn" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;font-family:inherit;" onclick="deleteCurrentAccount()">アカウントを削除する</button>
     </div>
   </div>
 
@@ -465,7 +474,7 @@
     <h3>💡 お金を増やす方法</h3>
     <div class="info-modal-body">
       <div style="font-size:0.86rem;line-height:1.85;color:var(--text);margin-bottom:20px;">
-        🏦 <strong>パパ銀行</strong>…年5%の利子が毎日つく。<br>
+        🏦 <strong>パパ銀行</strong>…年5%の利子が毎日つく。長く預けるほど複利でどんどん増える！<br>
         📈 <strong>パパ・インデックス</strong>…日経平均（日本の株）に連動してお金が増えたり減ったりする！<br>
         🌍 <strong>ママ・インデックス</strong>…オルカン（世界中の株）に連動してお金が増えたり減ったりする！
       </div>
@@ -535,6 +544,21 @@
   </div>
 </div>
 
+<!-- Add Account Modal -->
+<div class="modal-overlay" id="addAccountModal">
+  <div class="modal">
+    <h3>👤 アカウントを追加</h3>
+    <div class="form-group" style="margin-top:12px;">
+      <label>なまえ</label>
+      <input type="text" id="newAccountName" placeholder="例: そうたろう" maxlength="10" style="max-width:220px;">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-cancel" onclick="closeModal('addAccountModal')">キャンセル</button>
+      <button class="btn btn-confirm-dep" onclick="confirmAddAccount()">追加する</button>
+    </div>
+  </div>
+</div>
+
 <!-- Achievement Popup -->
 <div class="achievement-popup" id="achievementPopup"></div>
 
@@ -545,6 +569,45 @@
 // ══════════════════════════════════════════════════════
 const STORAGE_KEY = 'familyBank_v3';
 const STOCK_CACHE_KEY = 'familyBank_stockCache_v2';
+const ACCOUNTS_META_KEY = 'familyBank_accounts_meta';
+
+// ── アカウントカラーパレット ──
+const ACCOUNT_PALETTES = [
+  { chip:'linear-gradient(135deg,#f59e0b,#d97706)', nw:'linear-gradient(135deg,#fff7ed 0%,#fffbeb 55%,#f0f9ff 100%)', header:'linear-gradient(135deg,#fff7ed 0%,#fffbeb 50%,#f0f9ff 100%)', fade:'#fff7ed' },
+  { chip:'linear-gradient(135deg,#3b82f6,#2563eb)', nw:'linear-gradient(135deg,#eff6ff 0%,#dbeafe 55%,#f0f9ff 100%)', header:'linear-gradient(135deg,#eff6ff 0%,#dbeafe 50%,#f0f9ff 100%)', fade:'#eff6ff' },
+  { chip:'linear-gradient(135deg,#10b981,#059669)', nw:'linear-gradient(135deg,#f0fdf4 0%,#dcfce7 55%,#ecfdf5 100%)', header:'linear-gradient(135deg,#f0fdf4 0%,#dcfce7 50%,#ecfdf5 100%)', fade:'#f0fdf4' },
+  { chip:'linear-gradient(135deg,#ec4899,#db2777)', nw:'linear-gradient(135deg,#fdf2f8 0%,#fce7f3 55%,#fdf4ff 100%)', header:'linear-gradient(135deg,#fdf2f8 0%,#fce7f3 50%,#fdf4ff 100%)', fade:'#fdf2f8' },
+  { chip:'linear-gradient(135deg,#8b5cf6,#7c3aed)', nw:'linear-gradient(135deg,#f5f3ff 0%,#ede9fe 55%,#e0e7ff 100%)', header:'linear-gradient(135deg,#f5f3ff 0%,#ede9fe 50%,#e0e7ff 100%)', fade:'#f5f3ff' },
+  { chip:'linear-gradient(135deg,#f97316,#ea580c)', nw:'linear-gradient(135deg,#fff7ed 0%,#ffedd5 55%,#fef9c3 100%)', header:'linear-gradient(135deg,#fff7ed 0%,#ffedd5 50%,#fef9c3 100%)', fade:'#fff7ed' },
+];
+
+let accountMeta = null; // { accounts:[{id,name,colorIdx}], activeId }
+
+function loadAccountMeta() {
+  try { const r = localStorage.getItem(ACCOUNTS_META_KEY); return r ? JSON.parse(r) : null; } catch(e) { return null; }
+}
+function saveAccountMeta() {
+  try { localStorage.setItem(ACCOUNTS_META_KEY, JSON.stringify(accountMeta)); } catch(e) {}
+}
+function initAccountMeta() {
+  let meta = loadAccountMeta();
+  if (!meta) {
+    // 初回または旧データからの移行
+    const defaultId = 'acc_' + Date.now();
+    let defaultName = 'こどもちゃん';
+    const existingRaw = localStorage.getItem(STORAGE_KEY);
+    if (existingRaw) {
+      try {
+        const existing = JSON.parse(existingRaw);
+        if (existing.settings && existing.settings.childName) defaultName = existing.settings.childName;
+        localStorage.setItem(STORAGE_KEY + '_' + defaultId, existingRaw);
+      } catch(e) {}
+    }
+    meta = { accounts:[{ id:defaultId, name:defaultName, colorIdx:0 }], activeId:defaultId };
+    localStorage.setItem(ACCOUNTS_META_KEY, JSON.stringify(meta));
+  }
+  accountMeta = meta;
+}
 
 // ローカル日付を YYYY-MM-DD で返す（toISOString はUTC基準のため日本時間でズレる）
 function getLocalDateStr(d) {
@@ -561,6 +624,7 @@ const DEFAULT_DATA = {
   history: []
 };
 
+initAccountMeta();
 let appData = loadData();
 let stockPrices = { nikkei: null, nikkeiPrev: null, acwi: null, acwiPrev: null, nikkeiHist: [], acwiHist: [], usdjpy: null, isCache: false, cachedAt: null };
 let currentDepositAccount = null;
@@ -570,15 +634,15 @@ let detailChartInstance = null;
 
 function loadData() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-    // migrate from v2
-    const v2 = localStorage.getItem('familyBank_v2');
-    if (v2) { const d = JSON.parse(v2); d.history = d.history || []; return d; }
+    const key = STORAGE_KEY + '_' + accountMeta.activeId;
+    const raw = localStorage.getItem(key);
+    if (raw) return { ...JSON.parse(JSON.stringify(DEFAULT_DATA)), ...JSON.parse(raw) };
   } catch(e) {}
   return JSON.parse(JSON.stringify(DEFAULT_DATA));
 }
-function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); }
+function saveData() {
+  try { localStorage.setItem(STORAGE_KEY + '_' + accountMeta.activeId, JSON.stringify(appData)); } catch(e) {}
+}
 
 // ══════════════════════════════════════════════════════
 // STOCK FETCHING  — multi-proxy with automatic fallback
@@ -963,21 +1027,27 @@ function fmtProfitPct(profit, principal) {
 // RENDER ALL
 // ══════════════════════════════════════════════════════
 function renderAll() {
+  // Render account slider first — before anything that could throw
+  renderAccountSlider();
+  updateDeleteAccountSection();
   checkAchievements();
-  renderHeader();
+  renderNetWorthBg();
   renderNetWorth();
-  renderHome();
+  try { renderHome(); } catch(e) { console.warn('renderHome error', e); }
   renderBadges();
   renderHistory();
-  renderCompoundTimeline();
+  try { renderCompoundTimeline(); } catch(e) { console.warn('renderCompoundTimeline error', e); }
 }
 
-function renderHeader() {
-  const g = appData.gamification;
-  const lv = getCurrentLevel(g.xp);
-  const prog = getLevelProgress(g.xp);
-  document.getElementById('childNameDisplay').textContent = appData.settings.childName || 'こどもちゃん';
-  document.getElementById('levelBadge').textContent = `Lv.${lv.index+1} ${lv.name}`;
+function renderNetWorthBg() {
+  const acc = accountMeta.accounts.find(a => a.id === accountMeta.activeId);
+  if (!acc) return;
+  const p = ACCOUNT_PALETTES[acc.colorIdx % ACCOUNT_PALETTES.length];
+  document.getElementById('netWorthSection').style.background = p.nw;
+  const header = document.querySelector('.header');
+  if (header) header.style.background = p.header;
+  const switcher = document.getElementById('accountSwitcher');
+  if (switcher) switcher.style.setProperty('--switcher-fade', p.fade);
 }
 
 function renderNetWorth() {
@@ -1092,7 +1162,7 @@ function openDepositModal(account) {
   currentDepositAccount = account;
   const titles = { bank:'🏦 パパ銀行に預ける', papa:'📈 パパ・インデックスを買う', mama:'🌍 ママ・インデックスを買う' };
   const subs = {
-    bank:'年利5%の利子が毎日つく。',
+    bank:'年利5%・複利で毎日増えます。長く預けるほどお得！',
     papa:`日経平均連動。現在: ${stockPrices.nikkei ? fmtN(stockPrices.nikkei,0)+'円' : '---（設定から手動入力）'}`,
     mama:`全世界株式連動。現在: ${stockPrices.acwi ? fmtN(stockPrices.acwi,0)+'円' : '---（設定から手動入力）'}`
   };
@@ -1483,8 +1553,13 @@ function exportCSV() {
 // ══════════════════════════════════════════════════════
 function saveSettings() {
   const name = document.getElementById('settingChildName').value.trim();
-  if (name) appData.settings.childName = name;
-  saveData(); renderAll();
+  if (name) {
+    appData.settings.childName = name;
+    // sync name back to accountMeta
+    const acc = accountMeta.accounts.find(a => a.id === accountMeta.activeId);
+    if (acc) { acc.name = name; saveAccountMeta(); }
+  }
+  saveData(); renderAll(); // renderAll の先頭で renderAccountSlider() が呼ばれる
 }
 
 function applyManualPrices() {
@@ -1500,7 +1575,9 @@ function applyManualPrices() {
 }
 
 function resetData() {
-  if (!confirm('⚠️ 全てのデータをリセットしますか？\nこの操作は取り消せません！')) return;
+  const acc = accountMeta.accounts.find(a => a.id === accountMeta.activeId);
+  const name = acc ? acc.name : '';
+  if (!confirm(`「${name}」のデータをリセットしますか？\nこの操作は取り消せません！`)) return;
   appData = JSON.parse(JSON.stringify(DEFAULT_DATA));
   saveData(); renderAll();
 }
@@ -1690,7 +1767,11 @@ function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((el, i) => el.classList.toggle('active', tabs[i] === tab));
   document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
   document.getElementById('panel-'+tab).classList.add('active');
-  if (tab === 'settings') document.getElementById('settingChildName').value = appData.settings.childName || '';
+  if (tab === 'settings') {
+    const acc = accountMeta.accounts.find(a => a.id === accountMeta.activeId);
+    document.getElementById('settingChildName').value = (acc && acc.name) || appData.settings.childName || '';
+    updateDeleteAccountSection();
+  }
 }
 
 function closeModal(id) {
@@ -1717,10 +1798,174 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
 });
 
 // ══════════════════════════════════════════════════════
+// ACCOUNT SWITCHER
+// ══════════════════════════════════════════════════════
+
+function renderAccountSlider() {
+  const track = document.getElementById('accountTrack');
+  if (!track) return;
+  const { accounts, activeId } = accountMeta;
+  let html = '';
+  accounts.forEach(acc => {
+    const isActive = acc.id === activeId;
+    const p = ACCOUNT_PALETTES[acc.colorIdx % ACCOUNT_PALETTES.length];
+    const style = isActive ? `background:${p.chip};` : '';
+    html += `<div class="account-chip ${isActive ? 'active' : 'inactive'}" style="${style}" onclick="switchAccount('${acc.id}')">${acc.name}</div>`;
+  });
+  html += `<button class="account-add-btn" onclick="openAddAccountModal()">＋</button>`;
+  track.innerHTML = html;
+  centerActiveChip();
+}
+
+let _chipTransitionRAF = null;
+
+function centerActiveChip() {
+  const track = document.getElementById('accountTrack');
+  const switcher = document.getElementById('accountSwitcher');
+  if (!track || !switcher) return;
+
+  // 前回の遷移復元RAFをキャンセル（二重発火防止）
+  if (_chipTransitionRAF) { cancelAnimationFrame(_chipTransitionRAF); _chipTransitionRAF = null; }
+
+  // Step 1: アニメーション停止 & transformをゼロにリセット
+  track.style.transition = 'none';
+  track.style.transform = 'translateX(0)';
+
+  // Step 2: 強制リフロー（同期処理でtransform=0を確定させる）
+  void track.offsetWidth;
+
+  // Step 3: transform=0の状態で視覚座標を測定して中央位置を計算
+  const activeChip = track.querySelector('.account-chip.active');
+  if (!activeChip) { track.style.transition = ''; return; }
+
+  const swRect  = switcher.getBoundingClientRect();
+  const chRect  = activeChip.getBoundingClientRect();
+  const swCx    = swRect.left + swRect.width  / 2;
+  const chCx    = chRect.left + chRect.width  / 2;
+  const translate = swCx - chCx;
+
+  track.style.transform = `translateX(${translate}px)`;
+
+  // Step 4: 次フレームでアニメーションを戻す（ここだけ非同期）
+  _chipTransitionRAF = requestAnimationFrame(() => {
+    track.style.transition = '';
+    _chipTransitionRAF = null;
+  });
+}
+
+function switchAccount(id) {
+  if (id === accountMeta.activeId) return;
+  saveData();
+  accountMeta.activeId = id;
+  saveAccountMeta();
+  appData = loadData();
+  currentDepositAccount = null;
+  currentPwAccount = null;
+  currentDetailAccount = null;
+  renderAll(); // renderAll の先頭で renderAccountSlider() が呼ばれる
+  // sync settings name field if visible
+  const settingsPanel = document.getElementById('panel-settings');
+  if (settingsPanel && settingsPanel.classList.contains('active')) {
+    const acc = accountMeta.accounts.find(a => a.id === id);
+    document.getElementById('settingChildName').value = (acc && acc.name) || appData.settings.childName || '';
+  }
+}
+
+function openAddAccountModal() {
+  document.getElementById('newAccountName').value = '';
+  document.getElementById('addAccountModal').classList.add('show');
+  setTimeout(() => document.getElementById('newAccountName').focus(), 100);
+}
+
+function confirmAddAccount() {
+  const name = document.getElementById('newAccountName').value.trim();
+  if (!name) { alert('名前を入力してください'); return; }
+  const newId = 'acc_' + Date.now();
+  const colorIdx = accountMeta.accounts.length % ACCOUNT_PALETTES.length;
+  accountMeta.accounts.push({ id: newId, name, colorIdx });
+  saveAccountMeta();
+  closeModal('addAccountModal');
+  switchAccount(newId);
+}
+
+function updateDeleteAccountSection() {
+  const acc = accountMeta.accounts.find(a => a.id === accountMeta.activeId);
+  const name = acc ? acc.name : '';
+  const isSingle = accountMeta.accounts.length <= 1;
+
+  // データ管理セクションの説明文
+  const resetDesc = document.getElementById('resetDataDesc');
+  if (resetDesc) resetDesc.textContent = `「${name}」のデータをリセットします`;
+
+  // アカウント削除セクションの説明文とボタン状態
+  const deleteDesc = document.getElementById('deleteAccountDesc');
+  const deleteBtn  = document.getElementById('deleteAccountBtn');
+  if (!deleteDesc || !deleteBtn) return;
+  if (isSingle) {
+    deleteDesc.textContent = '他にアカウントがある場合のみ削除できます。';
+    deleteBtn.disabled = true;
+    deleteBtn.style.opacity = '0.45';
+    deleteBtn.style.cursor = 'not-allowed';
+  } else {
+    deleteDesc.textContent = `「${name}」のアカウントを削除します`;
+    deleteBtn.disabled = false;
+    deleteBtn.style.opacity = '1';
+    deleteBtn.style.cursor = 'pointer';
+  }
+}
+
+function deleteCurrentAccount() {
+  if (accountMeta.accounts.length <= 1) {
+    alert('アカウントが1つしかない場合は削除できません。');
+    return;
+  }
+  const acc = accountMeta.accounts.find(a => a.id === accountMeta.activeId);
+  const name = acc ? acc.name : 'このアカウント';
+  if (!confirm(`「${name}」のデータを全て削除しますか？\nこの操作は取り消せません！`)) return;
+
+  // Remove per-account localStorage data
+  try { localStorage.removeItem(STORAGE_KEY + '_' + accountMeta.activeId); } catch(e) {}
+
+  // Remove from accounts list, then switch to adjacent account
+  const idx = accountMeta.accounts.findIndex(a => a.id === accountMeta.activeId);
+  accountMeta.accounts.splice(idx, 1);
+  const newActiveId = accountMeta.accounts[Math.max(0, idx - 1)].id;
+  accountMeta.activeId = newActiveId;
+  saveAccountMeta();
+
+  appData = loadData();
+  currentDepositAccount = null;
+  currentPwAccount = null;
+  currentDetailAccount = null;
+  renderAll(); // renderAll の先頭で renderAccountSlider() が呼ばれる
+  switchTab('home');
+}
+
+function initAccountSwipe() {
+  let sx = 0, sy = 0;
+  document.addEventListener('touchstart', e => {
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - sx;
+    const dy = e.changedTouches[0].clientY - sy;
+    // horizontal swipe: at least 60px, more horizontal than vertical, no modal open
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && !document.querySelector('.modal-overlay.show')) {
+      const { accounts, activeId } = accountMeta;
+      const idx = accounts.findIndex(a => a.id === activeId);
+      if (dx < 0 && idx < accounts.length - 1) switchAccount(accounts[idx + 1].id);
+      else if (dx > 0 && idx > 0) switchAccount(accounts[idx - 1].id);
+    }
+  }, { passive: true });
+}
+
+// ══════════════════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════════════════
 doCheckIn();
-renderAll();
+renderAll(); // renderAll の先頭で renderAccountSlider() が呼ばれる
+initAccountSwipe();
 refreshStockPrices();
 setInterval(refreshStockPrices, 5 * 60 * 1000);
 </script>
