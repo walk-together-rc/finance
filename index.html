@@ -296,7 +296,7 @@
       <div class="card-header">
         <div>
           <div class="card-title"><span class="card-icon">🏦</span>パパ銀行</div>
-          <div class="card-subtitle">年利 5%・毎日複利で増える！</div>
+          <div class="card-subtitle" id="bankRateDisplay">年利 5%</div>
         </div>
         <div class="card-value bank" id="homeBank">¥0</div>
       </div>
@@ -306,7 +306,7 @@
           <div class="stat-value" id="homeBankPrincipal">¥0</div>
         </div>
         <div class="stat-item">
-          <div class="stat-label">💰 利子合計（確定分）</div>
+          <div class="stat-label">💰 利子合計</div>
           <div class="stat-value positive" id="homeBankInterest">+¥0</div>
         </div>
       </div>
@@ -421,6 +421,15 @@
       <button class="btn-save" onclick="saveSettings()">💾 保存する</button>
     </div>
     <div class="settings-card">
+      <h3>🏦 パパ銀行 利率設定</h3>
+      <p style="font-size:0.76rem;color:var(--text-dim);margin-bottom:12px;">変更後の日付から新しい利率で計算されます</p>
+      <div class="form-group">
+        <label>年利（%）</label>
+        <input type="number" id="settingBankRate" min="0.01" max="100" step="0.01" placeholder="例: 5" style="max-width:160px">
+      </div>
+      <button class="btn-save" onclick="saveBankRate()">💾 利率を保存する</button>
+    </div>
+    <div class="settings-card">
       <h3>📊 株価データ（手動入力）</h3>
       <p style="font-size:0.76rem;color:var(--text-dim);margin-bottom:12px;">自動取得に失敗した場合は手動で入力できます</p>
       <div class="stock-manual-row">
@@ -474,7 +483,7 @@
     <h3>💡 お金を増やす方法</h3>
     <div class="info-modal-body">
       <div style="font-size:0.86rem;line-height:1.85;color:var(--text);margin-bottom:20px;">
-        🏦 <strong>パパ銀行</strong>…年5%の利子が毎日つく。長く預けるほど複利でどんどん増える！<br>
+        🏦 <strong>パパ銀行</strong>…年<span id="infoBankRateDesc">5%</span>の利子が毎日つく。長く預けるほど複利でどんどん増える！<br>
         📈 <strong>パパ・インデックス</strong>…日経平均（日本の株）に連動してお金が増えたり減ったりする！<br>
         🌍 <strong>ママ・インデックス</strong>…オルカン（世界中の株）に連動してお金が増えたり減ったりする！
       </div>
@@ -607,6 +616,12 @@ function initAccountMeta() {
     localStorage.setItem(ACCOUNTS_META_KEY, JSON.stringify(meta));
   }
   accountMeta = meta;
+}
+
+// 利率を「X%」形式の文字列に変換（例: 0.05 → "5%"、0.035 → "3.5%"）
+function fmtRate(r) {
+  const pct = (r || 0.05) * 100;
+  return parseFloat(pct.toFixed(4)).toString().replace(/\.?0+$/, '') + '%';
 }
 
 // ローカル日付を YYYY-MM-DD で返す（toISOString はUTC基準のため日本時間でズレる）
@@ -1064,6 +1079,11 @@ function renderNetWorth() {
 
 function renderHome() {
   const nw = calcNetWorth();
+  // 利率表示を動的に更新
+  const rateStr = '年利 ' + fmtRate(appData.settings.bankRate);
+  document.getElementById('bankRateDisplay').textContent = rateStr;
+  const infoRateEl = document.getElementById('infoBankRateDesc');
+  if (infoRateEl) infoRateEl.textContent = fmtRate(appData.settings.bankRate);
   // Bank
   document.getElementById('homeBank').textContent = fmt(nw.bank.currentVal);
   document.getElementById('homeBankPrincipal').textContent = fmt(nw.bank.principal);
@@ -1162,7 +1182,7 @@ function openDepositModal(account) {
   currentDepositAccount = account;
   const titles = { bank:'🏦 パパ銀行に預ける', papa:'📈 パパ・インデックスを買う', mama:'🌍 ママ・インデックスを買う' };
   const subs = {
-    bank:'年利5%・複利で毎日増えます。長く預けるほどお得！',
+    bank:`年利${fmtRate(appData.settings.bankRate)}・複利で増えます。長く預けるほどお得！`,
     papa:`日経平均連動。現在: ${stockPrices.nikkei ? fmtN(stockPrices.nikkei,0)+'円' : '---（設定から手動入力）'}`,
     mama:`全世界株式連動。現在: ${stockPrices.acwi ? fmtN(stockPrices.acwi,0)+'円' : '---（設定から手動入力）'}`
   };
@@ -1377,8 +1397,8 @@ function buildBankDetailChart(ctx) {
     data: {
       labels,
       datasets: [
-        { label: '元金＋利子（円）', data: totalData, borderColor: '#d97706', backgroundColor: 'rgba(217,119,6,0.1)', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2.5 },
-        { label: '元金（円）', data: principalData, borderColor: '#94a3b8', backgroundColor: 'transparent', fill: false, tension: 0, pointRadius: 0, borderWidth: 1.5, borderDash: [5,4] }
+        { label: '元金（円）', data: principalData, borderColor: '#94a3b8', backgroundColor: 'rgba(148,163,184,0.12)', fill: true, tension: 0, pointRadius: 0, borderWidth: 2, borderDash: [6,4], order: 2 },
+        { label: '元金＋利子（円）', data: totalData, borderColor: '#d97706', backgroundColor: 'rgba(217,119,6,0.15)', fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2.5, order: 1 }
       ]
     },
     options: {
@@ -1394,7 +1414,7 @@ function buildBankDetailChart(ctx) {
   document.getElementById('detailInfo').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:0.82rem;">
       <div class="stat-item"><div class="stat-label">元金</div><div class="stat-value">${fmt(todayPrincipal)}</div></div>
-      <div class="stat-item"><div class="stat-label">確定利子</div><div class="stat-value positive">+${fmt(interest)}</div></div>
+      <div class="stat-item"><div class="stat-label">利子</div><div class="stat-value positive">+${fmt(interest)}</div></div>
       <div class="stat-item"><div class="stat-label">現在の評価額</div><div class="stat-value" style="color:#d97706">${fmt(todayTotal)}</div></div>
     </div>`;
 }
@@ -1412,10 +1432,23 @@ function buildIndexDetailChart(ctx, account) {
     return;
   }
 
-  const hist = rawHist.map(h => ({ date: h.date, price: h.price }));
+  // ── 直近6ヶ月にフィルタ ──
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const sixMonthsAgoStr = getLocalDateStr(sixMonthsAgo);
+  const hist = rawHist
+    .filter(h => h.date >= sixMonthsAgoStr)
+    .map(h => ({ date: h.date, price: h.price }));
+
+  if (hist.length === 0) {
+    document.getElementById('detailInfo').innerHTML =
+      `<div class="empty-state"><span class="empty-icon">📡</span>株価データを取得中です…<br><button class="btn-save" style="margin-top:12px;font-size:0.8rem;padding:8px 18px;" onclick="refreshStockPrices()">🔄 再取得する</button></div>`;
+    return;
+  }
+
   const currentPrice = rawCurrentPrice || null;
 
-  const labels = hist.map(h => h.date.slice(5));
+  const labels = hist.map(h => h.date.slice(5).replace('-', '/'));  // 'MM/DD'
   const priceData = hist.map(h => h.price);
   const todayIdx = hist.length - 1;
 
@@ -1434,11 +1467,11 @@ function buildIndexDetailChart(ctx, account) {
   const markerBg     = activeDeps.length === 0 ? '#64748b' : (totalProfit >= 0 ? '#16a34a' : '#dc2626');
   const markerBorder = activeDeps.length === 0 ? '#334155' : (totalProfit >= 0 ? '#14532d' : '#7f1d1d');
   ptStyle[todayIdx]  = 'circle';
-  ptRadius[todayIdx] = 10;
+  ptRadius[todayIdx] = 5;
   ptBg[todayIdx]     = markerBg;
   ptBorder[todayIdx] = markerBorder;
-  ptBorderW[todayIdx]= 2;
-  ptHover[todayIdx]  = 13;
+  ptBorderW[todayIdx]= 1.5;
+  ptHover[todayIdx]  = 7;
 
   // ── 購入マーカー（🔺三角・購入日の折れ線上） ──
   const buyInfoMap = {}; // histIdx → tooltip文字列
@@ -1446,11 +1479,11 @@ function buildIndexDetailChart(ctx, account) {
     const histIdx = hist.findIndex(h => h.date >= dep.date);
     if (histIdx < 0 || histIdx === todayIdx) continue;
     ptStyle[histIdx]  = 'triangle';
-    ptRadius[histIdx] = 9;
+    ptRadius[histIdx] = 5;
     ptBg[histIdx]     = '#f59e0b';
     ptBorder[histIdx] = '#92400e';
-    ptBorderW[histIdx]= 1.5;
-    ptHover[histIdx]  = 12;
+    ptBorderW[histIdx]= 1;
+    ptHover[histIdx]  = 6;
     buyInfoMap[histIdx] = `🔺 購入 ${dep.date.slice(5)}（${fmt(dep.amount)}）`;
   }
 
@@ -1491,7 +1524,7 @@ function buildIndexDetailChart(ctx, account) {
         }
       },
       scales: {
-        x: { type: 'category', ticks: { color:'#94a3b8', maxTicksLimit:8, font:{size:10} }, grid:{color:'#f1f5f9'} },
+        x: { ticks: { color:'#94a3b8', maxTicksLimit:9, font:{size:10}, maxRotation:0 }, grid:{color:'#f1f5f9'} },
         y: { ticks: { color:'#94a3b8', callback: v => '¥' + Math.round(v).toLocaleString('ja-JP'), font:{size:10} }, grid:{color:'#f1f5f9'} }
       }
     }
@@ -1560,6 +1593,18 @@ function saveSettings() {
     if (acc) { acc.name = name; saveAccountMeta(); }
   }
   saveData(); renderAll(); // renderAll の先頭で renderAccountSlider() が呼ばれる
+}
+
+function saveBankRate() {
+  const input = document.getElementById('settingBankRate');
+  const pct = parseFloat(input.value);
+  if (isNaN(pct) || pct <= 0 || pct > 100) {
+    alert('利率は0より大きく100以下の数値を入力してください');
+    return;
+  }
+  appData.settings.bankRate = pct / 100;
+  saveData();
+  renderAll();
 }
 
 function applyManualPrices() {
@@ -1770,6 +1815,8 @@ function switchTab(tab) {
   if (tab === 'settings') {
     const acc = accountMeta.accounts.find(a => a.id === accountMeta.activeId);
     document.getElementById('settingChildName').value = (acc && acc.name) || appData.settings.childName || '';
+    const rate = (appData.settings.bankRate || 0.05) * 100;
+    document.getElementById('settingBankRate').value = parseFloat(rate.toFixed(4));
     updateDeleteAccountSection();
   }
 }
