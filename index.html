@@ -1524,7 +1524,7 @@ function buildIndexDetailChart(ctx, account) {
         }
       },
       scales: {
-        x: { ticks: { color:'#94a3b8', maxTicksLimit:9, font:{size:10}, maxRotation:0 }, grid:{color:'#f1f5f9'} },
+        x: { ticks: { color:'#94a3b8', maxTicksLimit:6, font:{size:10}, maxRotation:0 }, grid:{color:'#f1f5f9'} },
         y: { ticks: { color:'#94a3b8', callback: v => '¥' + Math.round(v).toLocaleString('ja-JP'), font:{size:10} }, grid:{color:'#f1f5f9'} }
       }
     }
