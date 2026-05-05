@@ -620,7 +620,7 @@ function initAccountMeta() {
 
 // 利率を「X%」形式の文字列に変換（例: 0.05 → "5%"、0.035 → "3.5%"）
 function fmtRate(r) {
-  const pct = (r || 0.05) * 100;
+  const pct = (r || 0.01) * 100;
   return parseFloat(pct.toFixed(4)).toString().replace(/\.?0+$/, '') + '%';
 }
 
@@ -631,7 +631,7 @@ function getLocalDateStr(d) {
 function getLocalDate() { return getLocalDateStr(new Date()); }
 
 const DEFAULT_DATA = {
-  settings: { childName: 'こどもちゃん', bankRate: 0.05 },
+  settings: { childName: 'こどもちゃん', bankRate: 0.01 },
   bank: { deposits: [], withdrawals: [] },
   papa: { deposits: [], withdrawals: [] },
   mama: { deposits: [], withdrawals: [] },
@@ -833,7 +833,7 @@ function daysBetween(dateStr, toDate) {
 // Daily compounding, interest credited as whole yen only (floor)
 function bankCurrentValue(deposit, toDate) {
   const days = daysBetween(deposit.date, toDate);
-  const rate = appData.settings.bankRate || 0.05;
+  const rate = appData.settings.bankRate || 0.01;
   const rawInterest = deposit.amount * (Math.pow(1 + rate / 365, days) - 1);
   const creditedInterest = Math.floor(rawInterest); // only whole yen credited
   return deposit.amount + creditedInterest;
@@ -1820,7 +1820,7 @@ function switchTab(tab) {
   if (tab === 'settings') {
     const acc = accountMeta.accounts.find(a => a.id === accountMeta.activeId);
     document.getElementById('settingChildName').value = (acc && acc.name) || appData.settings.childName || '';
-    const rate = (appData.settings.bankRate || 0.05) * 100;
+    const rate = (appData.settings.bankRate || 0.01) * 100;
     document.getElementById('settingBankRate').value = parseFloat(rate.toFixed(4));
     updateDeleteAccountSection();
   }
